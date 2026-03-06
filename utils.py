@@ -1,0 +1,221 @@
+import logging
+import os
+import pickle
+from random import sample
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+
+class Logger(object):
+    level_relations = {
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'crit': logging.CRITICAL
+    }
+
+    def __init__(
+        self,
+        filename,
+        level='debug',
+        fmt='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s'
+    ):
+        self.logger = logging.getLogger(filename)
+        format_str = logging.Formatter(fmt)
+        self.logger.setLevel(self.level_relations.get(level))
+
+        sh = logging.StreamHandler()
+        sh.setFormatter(format_str)
+
+        th = logging.FileHandler(filename=filename, encoding='utf-8', mode='a')
+        th.setFormatter(format_str)
+        self.logger.addHandler(sh)
+        self.logger.addHandler(th)
+
+
+def reduce_mem_usage(df, verbose=True):
+    numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
+    start_mem = df.memory_usage().sum() / 1024**2
+    for col in df.columns:
+        col_type = df[col].dtypes
+        if col_type in numerics:
+            c_min = df[col].min()
+            c_max = df[col].max()
+            if str(col_type)[:3] == 'int':
+                if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(
+                        np.int8).max:
+                    df[col] = df[col].astype(np.int8)
+                elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(
+                        np.int16).max:
+                    df[col] = df[col].astype(np.int16)
+                elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(
+                        np.int32).max:
+                    df[col] = df[col].astype(np.int32)
+                elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(
+                        np.int64).max:
+                    df[col] = df[col].astype(np.int64)
+            else:
+                if c_min > np.finfo(np.float16).min and c_max < np.finfo(
+                        np.float16).max:
+                    df[col] = df[col].astype(np.float16)
+                elif c_min > np.finfo(np.float32).min and c_max < np.finfo(
+                        np.float32).max:
+                    df[col] = df[col].astype(np.float32)
+                else:
+                    df[col] = df[col].astype(np.float64)
+    end_mem = df.memory_usage().sum() / 1024**2
+    if verbose:
+        print('Mem. usage decreased to {:5.2f} Mb ({:.1f}% reduction)'.format(
+            end_mem, 100 * (start_mem - end_mem) / start_mem))
+    return df
+
+
+def evaluate(df, total):
+    hitrate_5 = 0
+    mrr_5 = 0
+
+    hitrate_10 = 0
+    mrr_10 = 0
+
+    hitrate_20 = 0
+    mrr_20 = 0
+
+    hitrate_40 = 0
+    mrr_40 = 0
+
+    hitrate_50 = 0
+    mrr_50 = 0
+
+    gg = df.groupby(['user_id'])
+
+    for _, g in tqdm(gg):
+        try:
+            item_id = g[g['label'] == 1]['article_id'].values[0]
+        except Exception as e:
+            continue
+
+        predictions = g['article_id'].values.tolist()
+
+        rank = 0
+        while predictions[rank] != item_id:
+            rank += 1
+
+        if rank < 5:
+            mrr_5 += 1.0 / (rank + 1)
+            hitrate_5 += 1
+
+        if rank < 10:
+            mrr_10 += 1.0 / (rank + 1)
+            hitrate_10 += 1
+
+        if rank < 20:
+            mrr_20 += 1.0 / (rank + 1)
+            hitrate_20 += 1
+
+        if rank < 40:
+            mrr_40 += 1.0 / (rank + 1)
+            hitrate_40 += 1
+
+        if rank < 50:
+            mrr_50 += 1.0 / (rank + 1)
+            hitrate_50 += 1
+
+    hitrate_5 /= total
+    mrr_5 /= total
+
+    hitrate_10 /= total
+    mrr_10 /= total
+
+    hitrate_20 /= total
+    mrr_20 /= total
+
+    hitrate_40 /= total
+    mrr_40 /= total
+
+    hitrate_50 /= total
+    mrr_50 /= total
+
+    return hitrate_5, mrr_5, hitrate_10, mrr_10, hitrate_20, mrr_20, hitrate_40, mrr_40, hitrate_50, mrr_50
+
+
+def gen_sub(prediction):
+    prediction.sort_values(['user_id', 'pred'],
+                         inplace=True,
+                         ascending=[True, False])
+
+    all_articles = set(prediction['article_id'].values)
+    sub_sample = pd.read_csv('../data/testA_click_log.csv')
+    test_users = sub_sample.user_id.unique()
+    
+    lines = []
+    for test_user in tqdm(test_users):
+        g = prediction[prediction['user_id'] == test_user]
+        g = g.head(5)
+        items = g['article_id'].values.tolist()
+
+        if len(set(items)) < 5:
+            buchong = all_articles - set(items)
+            buchong = sample(list(buchong), 5 - len(set(items)))
+            items += buchong
+
+        assert len(set(items)) == 5
+        lines.append([test_user] + items)
+
+    df_sub = pd.DataFrame(lines)
+    df_sub.columns = [
+        'user_id', 'article_1', 'article_2', 'article_3', 'article_4',
+        'article_5'
+    ]
+    return df_sub
+
+
+def gen_detailed_result(prediction, output_path, topk=0):
+    """
+    生成包含user_id, article_id, score, rank四列的详细结果文件
+    确保rank与gen_sub返回的推荐顺序一致
+    
+    Args:
+        prediction: 包含user_id, article_id, pred列的DataFrame
+        output_path: 输出文件路径
+        topk: 保留的topk结果，0表示保存所有结果
+    """
+    # 按用户和预测分数排序
+    prediction_sorted = prediction.sort_values(['user_id', 'pred'], 
+                                             ascending=[True, False]).copy()
+    
+    # 计算每个用户的物品排名
+    prediction_sorted['rank'] = prediction_sorted.groupby('user_id')['pred'].rank(ascending=False, method='first')
+    
+    # 重命名列
+    prediction_sorted['score'] = prediction_sorted['pred']
+    
+    # 归一化处理：当最大值大于1或最小值小于0时归一化到(0,1)开区间
+    score_min = prediction_sorted['score'].min()
+    score_max = prediction_sorted['score'].max()
+    if score_max > 1 or score_min < 0:
+        # 归一化到(0,1)开区间
+        epsilon = 1e-6
+        normalized_score = (prediction_sorted['score'] - score_min) / (score_max - score_min)
+        # 缩放到(0,1)开区间
+        prediction_sorted['score'] = epsilon + (1 - 2 * epsilon) * normalized_score
+    
+    # 构建输出列列表
+    output_cols = ['user_id', 'article_id', 'score', 'rank']
+    # 如果存在label列，添加到输出列中
+    if 'label' in prediction_sorted.columns:
+        output_cols.append('label')
+    
+    # 根据topk参数过滤结果
+    if topk > 0:
+        detailed_result = prediction_sorted[prediction_sorted['rank'] <= topk][output_cols]
+    else:
+        detailed_result = prediction_sorted[output_cols]
+    
+    # 确保输出目录存在
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # 保存到文件
+    detailed_result.to_csv(output_path, index=False)
+    
+    return detailed_result
