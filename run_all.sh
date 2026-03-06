@@ -14,11 +14,11 @@ cd /data3/fzy/TCxwtj/code
 
 # python recall_hot.py --mode valid
 
-# python recall_cold.py --mode valid
+python recall_cold.py --mode valid
 
 # # # 合并召回结果
 # # python recall.py --mode valid
-# python recall_lr.py --mode valid
+python recall_lr.py --mode valid
 
 # 3. 特征工程
 python rank_feature.py --mode valid

@@ -197,7 +197,10 @@ if __name__ == '__main__':
     else:
         df_feature = pd.read_pickle('../user_data/data/online/recall.pkl')
         df_click = pd.read_pickle('../user_data/data/online/click.pkl')
-
+    
+    if 'score_cold' in df_feature.columns:
+        df_feature.drop('score_cold', axis=1, inplace=True)
+        
     # 文章特征
     log.debug(f'df_feature.shape: {df_feature.shape}')
 
@@ -205,8 +208,7 @@ if __name__ == '__main__':
     df_article['created_at_ts'] = df_article['created_at_ts'] / 1000
     df_article['created_at_ts'] = df_article['created_at_ts'].astype('int')
     df_feature = df_feature.merge(df_article, how='left')
-    df_feature['created_at_datetime'] = pd.to_datetime(
-        df_feature['created_at_ts'], unit='s')
+    df_feature['created_at_datetime'] = pd.to_datetime(df_feature['created_at_ts'], unit='s')
 
     log.debug(f'df_article.head(): {df_article.head()}')
     log.debug(f'df_feature.shape: {df_feature.shape}')
@@ -308,7 +310,7 @@ if __name__ == '__main__':
     df_temp = df_click.groupby('user_id').agg(
         user_click_last_article_created_time=('created_at_ts', lambda x: x.iloc[-1]),
         user_clicked_article_created_time_max=('created_at_ts', 'max'),
-        # user_clicked_article_created_time_mean=('created_at_ts', 'mean')
+        user_clicked_article_created_time_mean=('created_at_ts', 'mean')
     ).reset_index()
     df_feature = df_feature.merge(df_temp, how='left')
 

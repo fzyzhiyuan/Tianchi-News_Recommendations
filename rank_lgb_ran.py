@@ -74,7 +74,8 @@ def train_model(df_feature):
     score_list = []
     score_df = trn_df[['user_id', 'article_id','label']]
     sub_preds = np.zeros(df_test.shape[0])
-
+    df_importance_list = []
+    
     # 五折交叉验证
     for n_fold, (trn_idx, val_idx) in enumerate(
             kfold.split(trn_df[feature_names], trn_df[ycol],
@@ -153,7 +154,22 @@ def train_model(df_feature):
             num_iteration=lgb_ranker.best_iteration_
         )
         
+        df_importance = pd.DataFrame({
+            'feature_name':
+            feature_names,
+            'importance':
+            lgb_ranker.feature_importances_,
+        })
+        df_importance_list.append(df_importance)
+        
         joblib.dump(lgb_ranker, f'../user_data/model/lgb_ranker{n_fold}.pkl')
+    
+    # 特征重要性
+    df_importance = pd.concat(df_importance_list)
+    df_importance = df_importance.groupby([
+        'feature_name'
+    ])['importance'].agg('mean').sort_values(ascending=False).reset_index()
+    log.debug(f'importance: {df_importance}')
     
     score_df_ = pd.concat(score_list, axis=0)
     score_df = score_df.merge(score_df_, how='left', on=['user_id', 'article_id'])
