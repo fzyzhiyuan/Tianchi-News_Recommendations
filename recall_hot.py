@@ -166,7 +166,7 @@ class HotRecall:
         user_id = row['user_id']
         target_item = row['click_article_id']
         
-        last_click_time = self.get_user_last_click(user_id, target_item)
+        last_click_time = self.get_user_last_click(user_id)
         if last_click_time is None:
             return None
             

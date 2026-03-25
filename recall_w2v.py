@@ -10,7 +10,7 @@ import pandas as pd
 from annoy import AnnoyIndex
 from gensim.models import Word2Vec
 from tqdm import tqdm
-
+from multiprocessing import cpu_count
 from utils import Logger, evaluate
 
 warnings.filterwarnings('ignore')
@@ -34,6 +34,7 @@ test_size = args.test_size
 top_k_recall=args.top_k_recall
 top_k_sim=args.top_k_sim
 last_k_int=args.last_k_int
+num_cores = cpu_count()
 
 # 初始化日志
 os.makedirs('../user_data/log', exist_ok=True)
@@ -66,9 +67,21 @@ def word2vec(df_, f1, f2, model_path):
                          hs=0,
                          seed=seed,
                          negative=5,
-                         workers=10,
-                         epochs=1)
+                         workers=num_cores//2,
+                         epochs=2)
         model.save(f'{model_path}/w2v.m')
+    
+    # model = Word2Vec(sentences=sentences,
+    #                      vector_size=256,
+    #                      window=3,
+    #                      min_count=1,
+    #                      sg=1,
+    #                      hs=0,
+    #                      seed=seed,
+    #                      negative=5,
+    #                      workers=num_cores//2,
+    #                      epochs=1)
+    # model.save(f'{model_path}/w2v.m')
 
     article_vec_map = {}
     for word in set(words):

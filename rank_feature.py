@@ -283,7 +283,8 @@ if __name__ == '__main__':
     df_feature = df_feature.merge(df_temp, how='left')
     
     # 点击的设备相关信息
-    device_cols = ['click_environment', 'click_deviceGroup', 'click_os', 'click_country', 'click_region', 'click_referrer_type']
+    # device_cols = ['click_environment', 'click_deviceGroup', 'click_os', 'click_country', 'click_region', 'click_referrer_type']
+    device_cols = ['click_deviceGroup', 'click_os', 'click_region', 'click_referrer_type']
     for col in device_cols:
         if col in df_click.columns:
             # 添加最后一次点击的设备信息

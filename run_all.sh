@@ -1,23 +1,23 @@
 #!/bin/bash
 cd /data3/fzy/TCxwtj/code
 # # 1. 数据处理
-# python data.py --mode valid
+python data.py --mode valid
 
 # # # 2. 召回
-# python recall_w2v.py --mode valid
+python recall_w2v.py --mode valid
 
-# python recall_binetwork.py --mode valid
+python recall_binetwork.py --mode valid
 
-# python recall_itemcf.py --mode valid
+python recall_itemcf.py --mode valid
 
-# python recall_usercf.py --mode valid
+python recall_usercf.py --mode valid
 
-# python recall_hot.py --mode valid
+python recall_hot.py --mode valid
 
 python recall_cold.py --mode valid
 
-# # # 合并召回结果
-# # python recall.py --mode valid
+# # 合并召回结果
+# python recall.py --mode valid
 python recall_lr.py --mode valid
 
 # 3. 特征工程

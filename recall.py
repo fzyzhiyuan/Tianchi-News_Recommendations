@@ -112,7 +112,7 @@ if __name__ == '__main__':
     log.debug(f'max_threads {max_threads}')
 
     # 增加多种召回方法
-    recall_methods = ['itemcf', 'binetwork','w2v','usercf','hot']
+    recall_methods = ['itemcf', 'binetwork','w2v','usercf','hot','cold']
 
     # 调整召回权重 - 根据各召回方法的性能调整
     weights = {
@@ -120,7 +120,8 @@ if __name__ == '__main__':
         'binetwork': 10, 
         'w2v': 1,
         'usercf': 1,
-        'hot': 5
+        'hot': 5,
+        'cold':1
     }
     weight_sum = sum(weights.values())
     
